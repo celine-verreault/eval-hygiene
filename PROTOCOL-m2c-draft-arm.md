@@ -100,3 +100,29 @@ all.** The row already passes through; the measurement belongs in it.
 - Rate flat, drafts were good: draft quality is not the binding constraint. Look at what the workers actually failed on
   (store order, type reasoning) rather than at the tool.
 - Rate flat, drafts were bad: Stage 0 already said so, and Stage 1 should not have run.
+
+## 6. Superseded on the day it was written (22 Nov, 18:2x)
+
+The fleet's judge now writes, into **every** row: `test_runs`, `failed_test_runs`, `failed_test_runs_before_edit`, and
+per allowed tool entry `tool_calls` with `calls`, `refused` and `with_output`. Checked against the 22 runs above, it
+reproduces the hand counts exactly.
+
+**Consequence: Stage 1 is parked, not run.** The primary outcome of this design is now a standing field, collected on
+every task and every model instead of one task on the cheapest rung, at no extra cost. Spending 32 + 32 runs to measure
+what the fleet reports for free would be paying for a worse copy of the same number.
+
+`failed_test_runs_before_edit` is better than the design above, and specifically fixes its worst part: the original
+needed a task-specific definition of "the first failure that does not count", which would not have travelled between
+tasks. Subtracting the before-edit failures removes that definition entirely.
+
+What the standing fields still cannot answer, and the only residue worth an arm later: **the counterfactual of a worker
+that was told about the tool versus one that was not.** Uptake is visible in the rows (`calls`, `refused`, `with_output`);
+the effect of the prompt line is not. Hold it until the rows show low uptake — if real rounds already call the tool the
+question is moot, and if they never call it, the prompt line earns its small arm then, on evidence.
+
+When a week of rows exists, the analysis is observational and must not compare raw rates across tasks: stratify by task
+and model, or regress with the launching session as the cluster, as in the noise-floor note.
+
+**Open definition, asked and unanswered:** does "edit" mean any write inside the sandbox, or only the draft C file? A
+worker that edits a header and re-runs must not have that failure counted as before-edit, or the subtraction hides a real
+failure of the worker's own code.
