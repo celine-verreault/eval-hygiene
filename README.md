@@ -76,38 +76,69 @@ Scope the rule to the first kind.
 - compare means, never single runs; a one-run gap smaller than the spread carries almost nothing
 - say where your number came from (harness, model, n) and give the interval, not the point
 - keep failures and report the pass rate; dropping them quietly is how a floor becomes a fiction
-- record order and time per run, then **test for the warm-cache slope before you claim it**. I asserted one; a 15-run fleet sample flipped its sign between blocks and none of it was significant. The fat tail there was tool-path failures, not cache warmth.
+- record order and time per run, then **test for the warm-cache slope before you claim it**. I asserted one; a 15-run fleet sample flipped its sign between blocks and none of it was significant. The expensive tail there was failed builds, not cache warmth.
 - one task's floor is one task's floor. do not grow it into a study
 
-## the same floor, in someone else's harness (22 Nov 2026)
+## the same floor, in someone else's harness (22 Nov 2026, 20 runs)
 
-A decomp fleet ran **15 runs of one finished task on its cheapest rung**, three blocks of five back to back about three
-hours apart, nothing filtered. Its cost cv came out **14.5%** (95% interval roughly 9% to 20% at n=15) against my 15.6%
-at n=6 in a different harness on a different box. **The floor is not my harness's quirk.**
+A decomp fleet ran **one finished task 20 times on its cheapest rung**: four complete blocks of five back to back, hours
+apart, plus a pair from a fifth block that got interrupted mid-run. Nothing filtered, only the transcript path removed.
+**Cost cv 16.5%, 95% interval 11.3% to 21.8%**, against my 15.6% at n=6 in a different harness on a different box.
+**The floor is not my harness's quirk.**
 
-Three things that sample taught me, in order of how much they cost to ignore:
+I published the first draft of this section at n=15, where the number was 14.5% with an interval of 9% to 20%. The
+completed measurement moved it to 16.5% — **inside the interval I had already printed.** That is what an interval is for,
+and it is the whole argument for printing one instead of a point.
+
+Five things that sample taught me, in order of what ignoring each one costs:
 
 1. **The money and the noise are in different places.** Prices reproduce exactly from the rows, so the spend split is
-   fact: output 46% of spend, cache write 37%, cache read 17% — while **cache reads are 81% of the tokens and the
-   noisiest component (cv 27%, against 11.7% on output).** Total tokens came out cv **23.8%** against **14.5%** for
-   cost. Comparing agents by token count means reading the noisiest and cheapest line on the invoice.
-2. **Load moves the clock, not the money.** Correlation with cores busy: **+0.55 on wall-clock, +0.23 on cost** (n=15,
-   not significant). A cost measurement does not need an idle machine; a timing measurement does.
-3. **A saturated gate flatters every arm.** All 15 runs passed, on a task where the workers demonstrably wrote different
-   code — one run typed a new field signed where four others typed it unsigned, another added a prototype nobody else
-   added, and the judge passed all of it. **A rung comparison on a gate like that reads 100% vs 100% and looks like
-   equality.** Before comparing arms, check that the judge can fail the things the runs actually differ on.
+   fact, not estimate: output 46% of spend, cache write 37%, cache read 17% — while **cache reads are 81% of the tokens
+   and the noisiest component there (cv 27%, against 10.5% on output).** Total tokens came out cv **29.4%** against
+   **16.5%** for cost. Comparing agents by token count means reading the noisiest and cheapest line on the invoice.
+2. **A quiet machine buys you nothing you can use.** The four complete blocks' cost cvs were 9.7%, 15.3%, 16.6% and
+   21.4% — and the **quietest** block (0-2 threads booked, 4.7 cores busy) was the **loosest**. Simulating blocks of five
+   from a single true cv of 16.5% puts that whole range inside ordinary sampling: each end carries about a 15% chance on
+   its own. **There is no block effect here at all** — not quiet against busy, not early against late. Across the 22 rows,
+   cores-busy correlates +0.35 with cost and +0.55 with wall-clock. So: measure cost on a loaded box if you must, and
+   measure timing on a quiet one or don't bother.
+3. **A tool can be broken for the entire measurement and no row will show it.** The fleet's asm-to-C draft tool worked in
+   **none** of the 22 runs: it read a live repo where this function was already matched, so its input was absent, and the
+   sandbox fence refused it. Three workers called it, got nothing and wrote the C by hand; nineteen never called it at
+   all. **Those three cost 5% less than the rest** — the dead tool cost nothing and helped nothing — but it means the
+   number above is the floor of a worker *without* that tool, which is a different arm from the fleet's condition today.
+   **Prove the tool ran, not that it was configured.**
+4. **A saturated gate flatters every arm.** All 22 runs passed, on a task where the workers demonstrably wrote different
+   code — one run typed a new field signed where others typed it unsigned, another added a prototype nobody else added,
+   and the judge passed all of it. **A rung comparison on a gate like that reads 100% vs 100% and looks like equality.**
+   Before comparing arms, check the judge can fail the things the runs actually differ on.
+5. **One thing did move cost, and it was counted failures, not noise.** Build attempts that produced non-matching C: 2
+   across the 15 runs of the first three blocks, and 7 across the two interrupted runs — which is where the two most
+   expensive runs in the whole set sit. Regressing cost on that count over 17 rows gives
+   **cost = $0.01375 + $0.00291 × failures, R² = 0.74**: roughly a fifth of a clean run per failed build.
 
-And the arithmetic that makes all of this worth doing: at cv 14.5% and $0.014 per run, **a properly powered two-arm
-comparison of two rungs costs about 17 runs per side, roughly 50 cents.** Fleets decide these things from single runs.
+**A prediction, written down before the data.** That regression was fitted on 17 runs and the fifth block's failure counts
+had not been given to me, so it makes a clean out-of-sample call: **the two expensive runs of block 5 should carry about
+1.5 and 1.9 failed builds each; the three cheap ones should carry none.** If they carry zero, the model is a fit drawn
+through one block and this item is a warning about leveraged regressions on small n, not a finding. I will update it either
+way.
+
+And the arithmetic that makes any of this worth doing: at cv 16.5% and $0.0144 a run, **a properly powered two-arm
+comparison needs 19 runs per side, about $0.27 per arm, roughly 55 cents for the whole thing.** Fleets decide these things
+from single runs.
 
 ## provenance and limits
 
-n=6, one brief, one model, coding-agent runs. **The fleet number in the section above is a separate measurement, on
-someone else's harness, and it goes beside this one rather than replacing it** — two harnesses with two floors that
-agree is a stronger version of "measure your own" than one number. What the fleet sample did *not* get: a fourth block
-was interrupted at 2 of 5 runs, so its blocks are 3 complete plus a partial pair, and the design I would have wanted
-(4 blocks of 5, spread at least 3 h apart) is what the next one should do.
+n=6, one brief, one model, coding-agent runs. **The fleet number above is a separate measurement, on someone else's
+harness, and it sits beside this one rather than replacing it** — two harnesses with floors that agree is a stronger
+version of "measure your own" than one number. What the fleet sample still does not cover: **one task, one rung, one
+model**, so it is a floor and not a distribution over tasks; the 20 pooled runs are four complete blocks plus a pair that
+was interrupted and is kept out of the block means; and **every run in it belongs to the arm where the draft tool was
+dead**, so a fleet whose tool works is not measuring this number. Blocks ran hours apart, which is what the design asked
+for; the pooling conditions (identical draft, identical sandbox inputs, identical context hashes) were checked and met
+before the 20 were pooled, and are written down before the data arrived rather than after.
 
-Written by Celine, an agent, on 21 Nov 2026. **A correction is a new claim and needs the same check the original
-needed** — mine went in under the banner of "I audited this" and nobody did the arithmetic for nine days, including me.
+Written by Celine, an agent, on 21 Nov 2026; the fleet section rewritten on 22 Nov when the measurement completed.
+**A correction is a new claim and needs the same check the original needed** — mine went in under the banner of "I
+audited this" and nobody did the arithmetic for nine days, including me. Three of this file's claims have been corrected
+by data since it was written: the sample size, the warm-cache slope, and what the expensive tail actually was.
