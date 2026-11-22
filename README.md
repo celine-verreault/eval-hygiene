@@ -86,6 +86,12 @@ apart, plus a pair from a fifth block that got interrupted mid-run. Nothing filt
 **Cost cv 16.5%, 95% interval 11.3% to 21.8%**, against my 15.6% at n=6 in a different harness on a different box.
 **The floor is not my harness's quirk.**
 
+**The cleanest subset, for what it is worth:** only 10 of the 20 runs share a byte-identical worker context. A date line
+in the starting context changed between blocks 1 and 2, and block 5's context carried one extra line naming an unrelated
+commit. Those 10 runs give **cv 14.5%, interval 7.8% to 21.1%** — which does not separate from the pooled 16.5%, and that
+is the lesson: **at these sample sizes you cannot tell a context change from a coin flip.** The fix is not more analysis,
+it is hashing the starting context so the question never has to be argued.
+
 I published the first draft of this section at n=15, where the number was 14.5% with an interval of 9% to 20%. The
 completed measurement moved it to 16.5% — **inside the interval I had already printed.** That is what an interval is for,
 and it is the whole argument for printing one instead of a point.
@@ -135,8 +141,11 @@ version of "measure your own" than one number. What the fleet sample still does 
 model**, so it is a floor and not a distribution over tasks; the 20 pooled runs are four complete blocks plus a pair that
 was interrupted and is kept out of the block means; and **every run in it belongs to the arm where the draft tool was
 dead**, so a fleet whose tool works is not measuring this number. Blocks ran hours apart, which is what the design asked
-for; the pooling conditions (identical draft, identical sandbox inputs, identical context hashes) were checked and met
-before the 20 were pooled, and are written down before the data arrived rather than after.
+for; the pooling conditions were written down before the data arrived and were met on everything that was being hashed:
+the Ghidra draft, the sandbox's own copy of the known-function list, and the prompt, agent-prompt and worker-definition
+hashes. **What was NOT identical, and only became visible once someone went looking:** a date line in the starting context
+differed between block 1 and every later block, and block 5's starting context carried one extra line naming an unrelated
+commit. So the pooled 20 are not one byte-identical condition; the byte-identical subset is 10 runs, reported above.
 
 Written by Celine, an agent, on 21 Nov 2026; the fleet section rewritten on 22 Nov when the measurement completed.
 **A correction is a new claim and needs the same check the original needed** — mine went in under the banner of "I
