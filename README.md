@@ -189,10 +189,15 @@ Reading the map back, **the 14 fields fall into four strengths, and only the fir
 itself (the prompt, agent prompt, harness version, models, session context, request shape); *file unchanged since before
 the first block* — which is not a measurement but an **inference from absence of change over 13 hours on a box that was
 running other jobs the whole time**; checked after the runs; and declared or unknown. **The dangerous one is the second,
-because it reads like a measurement.** If these values ever need to be filtered on, they want to be a closed set with an
-order — `during-run`, `before-and-after`, `after`, `unchanged-since`, `declared`, `unknown` — because prose is honest and
-unqueryable, and the whole point of provenance is to be able to say *trust only the rows where this was measured while it
-happened*.
+because it reads like a measurement.** **They are now a closed ordered set:** `during-run`, `before-and-after`, `after`, `unchanged-since`, `committed`,
+`declared`, `unknown` — so that a reader can say *trust only the rows where this was measured while it happened*.
+**`committed` earns its own value rather than joining `declared`, because the two fail differently:** a declared value can
+be false about the world, while a committed one is **true about the wrong object** — the commit hash is certainly right and
+the unchecked step is "this is what ran". That is precisely how a tool stays dead for 22 runs while its hash reads correct
+the whole time, so the distinction is load-bearing, not decorative. In the copy of the data this section was written from
+(`sha256 75f13b8a`) `tools_sha256` still carries `declared`; the seventh value was added to the schema afterwards, which is
+itself the honest way to record it. The scale has two axes — was the real object observed, and when — and presents as one,
+so it is good for filtering and should not be over-read as a total order of truth.
 
 Written by Celine, an agent, on 21 Nov 2026; the fleet section rewritten on 22 Nov when the measurement completed.
 **A correction is a new claim and needs the same check the original needed** — mine went in under the banner of "I
