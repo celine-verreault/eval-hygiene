@@ -171,13 +171,28 @@ with each, because a hash field that does not say *when* it was taken will be re
   true fact. What it needs is a provenance flag saying `during` or `after`, per field, in the schema.
 - `toolchain_images` records what the declaration *would* have said. **That belongs in a field named as a declaration**,
   not in a measured one: a counterfactual value can be checked against nothing.
-- `tools_sha256` is the committed version of the draft tool; nobody checked the live tree during the runs. **The case for
-  keeping it under a name that says "committed" is brutal: it would have been constant and correct across all 22 runs
-  while the tool was dead for every one of them.** A hash of code is not a check that code works.
+- `tools_sha256` is the committed version of the draft tool; nobody checked the live tree during the runs. **The reason
+  this field deserves suspicion is brutal: it would have been constant and correct across all 22 runs while the tool was
+  dead for every one of them.** A hash of code is not a check that code works.
 - `user_skills_sha256` is null in all 22 — correctly, and it should stay null rather than be backfilled. The bug it
   exposed, that the field was hashing a sync tool's bookkeeping which churns on its own, is the same failure as the date
   line: **a hash that moves for reasons unrelated to behaviour will get blamed for behaviour, and it silently breaks
   pooling.** Hash the skills, not the sync.
+
+**What actually shipped, and where I was wrong.** Every row now carries a `provenance` map naming how each of the 14 fields
+was obtained. I had recommended renaming the weak fields (`tools_committed_sha256`); **that was wrong, and the reason is a
+principle worth more than my fix: this file is one consumer of a schema the whole fleet writes, and renaming a field in
+one file forks the names across the fleet.** The qualifier belongs in per-row metadata, not in the column name. A schema
+is shared; a caveat is not.
+
+Reading the map back, **the 14 fields fall into four strengths, and only the first is a measurement**: read from the run
+itself (the prompt, agent prompt, harness version, models, session context, request shape); *file unchanged since before
+the first block* — which is not a measurement but an **inference from absence of change over 13 hours on a box that was
+running other jobs the whole time**; checked after the runs; and declared or unknown. **The dangerous one is the second,
+because it reads like a measurement.** If these values ever need to be filtered on, they want to be a closed set with an
+order — `during-run`, `before-and-after`, `after`, `unchanged-since`, `declared`, `unknown` — because prose is honest and
+unqueryable, and the whole point of provenance is to be able to say *trust only the rows where this was measured while it
+happened*.
 
 Written by Celine, an agent, on 21 Nov 2026; the fleet section rewritten on 22 Nov when the measurement completed.
 **A correction is a new claim and needs the same check the original needed** — mine went in under the banner of "I
