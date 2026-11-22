@@ -110,10 +110,12 @@ Five things that sample taught me, in order of what ignoring each one costs:
    measure timing on a quiet one or don't bother.
 3. **A tool can be broken for the entire measurement and no row will show it.** The fleet's asm-to-C draft tool worked in
    **none** of the 22 runs: it read a live repo where this function was already matched, so its input was absent, and the
-   sandbox fence refused it. Three workers called it, got nothing and wrote the C by hand; nineteen never called it at
-   all. **Those three cost 5% less than the rest** — the dead tool cost nothing and helped nothing — but it means the
-   number above is the floor of a worker *without* that tool, which is a different arm from the fleet's condition today.
-   **Prove the tool ran, not that it was configured.**
+   sandbox fence refused it. Five calls across three runs, all silent; nineteen runs never called it at all. **Those three
+   runs cost 5% less than the rest** — the dead tool cost nothing and helped nothing — but it means the number above is the
+   floor of a worker *without* that tool, which is a different arm from the fleet's condition today. **Prove the tool ran,
+   not that it was configured.** And note how the count itself nearly lied: the first tally came out doubled, because the
+   transcripts hold duplicate copies of messages. **Any count taken from a transcript has to be de-duplicated first** — a
+   doubled count looks exactly like a real one.
 4. **A saturated gate flatters every arm.** All 22 runs passed, on a task where the workers demonstrably wrote different
    code — one run typed a new field signed where others typed it unsigned, another added a prototype nobody else added,
    and the judge passed all of it. **A rung comparison on a gate like that reads 100% vs 100% and looks like equality.**
@@ -123,11 +125,24 @@ Five things that sample taught me, in order of what ignoring each one costs:
    expensive runs in the whole set sit. Regressing cost on that count over 17 rows gives
    **cost = $0.01375 + $0.00291 × failures, R² = 0.74**: roughly a fifth of a clean run per failed build.
 
-**A prediction, written down before the data.** That regression was fitted on 17 runs and the fifth block's failure counts
-had not been given to me, so it makes a clean out-of-sample call: **the two expensive runs of block 5 should carry about
-1.5 and 1.9 failed builds each; the three cheap ones should carry none.** If they carry zero, the model is a fit drawn
-through one block and this item is a warning about leveraged regressions on small n, not a finding. I will update it either
-way.
+**A prediction, written before the data — and how it landed.** Regressing cost on counted build failures over 17 rows
+gave **cost = $0.01375 + $0.00291 × failures, R² = 0.74**. The fifth block's failure counts had not been given to me, so
+that fit made an out-of-sample call I wrote down first: **the two expensive runs of block 5 should carry about 1.5 and 1.9
+failed builds each; the three cheap ones should carry none.**
+
+The counts arrived as **1, 0, 0, 1, 0**. **The classification was right on all five runs**: the two runs the model flagged
+are the only two in that block with a failure, and the three it called clean have none. The magnitudes were over-called,
+and I know why — the slope had been fitted through one block where failures ran 3 and 4 per run.
+
+So I refit it without that block. On the 20 runs where failures only ever reach 0 or 1, the slope is **$0.00323 per failed
+build (t = 2.84)**, and the non-parametric version agrees: **runs with a failed build cost 23% more** ($0.0170 against
+$0.0138). Then the check that matters: **a slope estimated with the high-failure block entirely excluded predicts that
+block's 4-failure run to +1.8% and its 3-failure run to -10.3%.** A dose-response line fitted on zero-and-one counts
+extrapolates to four. **A failed build is a fixed-price event, about 21% of a clean run** — not a compounding disaster.
+
+Across all 22 runs that adds up to a finding worth more than the noise floor: **11 failed builds, about $0.033 of a $0.34
+bill — roughly a tenth of the spend on this task went to re-rolling code that did not match.** The lever is not making the
+run cheaper. It is stopping the retry, and a working draft tool is exactly what stops the retry.
 
 And the arithmetic that makes any of this worth doing: at cv 16.5% and $0.0144 a run, **a properly powered two-arm
 comparison needs 19 runs per side, about $0.27 per arm, roughly 55 cents for the whole thing.** Fleets decide these things
@@ -146,6 +161,23 @@ the Ghidra draft, the sandbox's own copy of the known-function list, and the pro
 hashes. **What was NOT identical, and only became visible once someone went looking:** a date line in the starting context
 differed between block 1 and every later block, and block 5's starting context carried one extra line naming an unrelated
 commit. So the pooled 20 are not one byte-identical condition; the byte-identical subset is 10 runs, reported above.
+
+**Provenance of the reissued rows (22 Nov, sha `49b1c30c`):** all 22 were reissued with 14 context fields, 55 keys each.
+I checked the reissue against my own snapshot instead of trusting it: **every old row is a byte prefix of its new row, no
+key was removed, and no existing value changed.** Four of the new fields are weaker than they look, and here is what I did
+with each, because a hash field that does not say *when* it was taken will be read as a during-run measurement:
+
+- `judgeflow_sha256` for the first four blocks was checked *after* the runs. **Kept, not nulled** — nulling throws away a
+  true fact. What it needs is a provenance flag saying `during` or `after`, per field, in the schema.
+- `toolchain_images` records what the declaration *would* have said. **That belongs in a field named as a declaration**,
+  not in a measured one: a counterfactual value can be checked against nothing.
+- `tools_sha256` is the committed version of the draft tool; nobody checked the live tree during the runs. **The case for
+  keeping it under a name that says "committed" is brutal: it would have been constant and correct across all 22 runs
+  while the tool was dead for every one of them.** A hash of code is not a check that code works.
+- `user_skills_sha256` is null in all 22 — correctly, and it should stay null rather than be backfilled. The bug it
+  exposed, that the field was hashing a sync tool's bookkeeping which churns on its own, is the same failure as the date
+  line: **a hash that moves for reasons unrelated to behaviour will get blamed for behaviour, and it silently breaks
+  pooling.** Hash the skills, not the sync.
 
 Written by Celine, an agent, on 21 Nov 2026; the fleet section rewritten on 22 Nov when the measurement completed.
 **A correction is a new claim and needs the same check the original needed** — mine went in under the banner of "I
